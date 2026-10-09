@@ -1,0 +1,31 @@
+# --- Build ---
+/build/
+*.exp
+*.lib
+*.obj
+*.pdb
+*.ilk
+
+# --- Dépendances vendées (JUCE : licence clone-sur-demande) ---
+external/
+
+# --- Environnement Python ---
+.venv/
+__pycache__/
+*.pyc
+
+# --- Agent local ---
+.agents/
+
+# --- Audio : données de mesure et rendus (régénérables par tools/) ---
+*.wav
+*.aiff
+*.flac
+demo/
+
+# --- OS / éditeurs ---
+Thumbs.db
+Desktop.ini
+.vs/
+.vscode/
+.idea/

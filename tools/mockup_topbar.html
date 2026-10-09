@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>OD Vox — top bar V2 (sur la pédale, boutons analogiques)</title>
+<style>
+  /* ============================================================
+     TOP BAR V2 — la barre vit SUR le corps de la pédale (x75..890,
+     y30..465 a l'echelle editeur), raccourcie, avec des boutons
+     faux-3D : capsules en relief, biseaux, LED. Le LCD se reduit
+     legerement (scale) pour tenir sous la barre — la vue C++ fera
+     pareil via setTransform, le dessin 1:1 est conserve.
+
+     Tout se regle par variables CSS. Recharger = voir.
+     ============================================================ */
+  :root {
+    --ed-w: 980px;
+    --ed-h: 516px;
+
+    /* Corps de la pedale (mesure sur la photo a l'echelle editeur) */
+    --pedal-x0: 75px;  --pedal-x1: 890px;
+    --pedal-y0: 30px;  --pedal-y1: 465px;
+
+    /* --- Barre : DANS la pedale, raccourcie --- */
+    --bar-x: 95px;            /* marge gauche dans la pedale */
+    --bar-y: 44px;
+    --bar-h: 54px;
+
+    /* --- LCD --- */
+    --lcd-scale: 0.82;        /* 753x419 * 0.82 = 617x344 */
+    --lcd-x: 164px;           /* centre sur la pedale */
+    --lcd-y: 108px;
+
+    /* --- ACCENT (couleur principale) : ces 6 lignes pilotent TOUT
+       (logo, couronne A, LED CAL). Change-les, recharge, c'est tout. */
+    --accent:      #bd9bff;        /* serigraphie / valeur              */
+    --accent-hi:   #e8dcff;        /* centre des LED (le plus clair)    */
+    --accent-mid:  #a86ef5;        /* LED, milieu du degrade            */
+    --accent-dark: #6b3fc4;        /* LED, bord du degrade / veilleuse  */
+    --accent-glow: 150, 95, 255;   /* triplet rgb pour les halos rgba() */
+    --accent-deep: #4d3385;        /* bague, bordure de couronne        */
+
+    color-scheme: dark;
+  }
+  body { margin: 0; padding: 24px; background: #17181a; color: #cfd2d6;
+         font: 13px/1.5 "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  .hint { color: #8a8f96; margin: 0 0 16px; }
+
+  .stage {
+    position: relative; width: var(--ed-w); height: var(--ed-h);
+    background: #000 url("../assets/background.png") center / cover no-repeat;
+    outline: 1px solid #2c2e32; overflow: hidden;
+  }
+
+  /* --- La barre, posée SUR la pédale --------------------------------- */
+  .bar {
+    position: absolute;
+    left: var(--bar-x); top: var(--bar-y);
+    width: calc(var(--pedal-x1) - var(--pedal-x0) - 2 * (var(--bar-x) - var(--pedal-x0)));
+    height: var(--bar-h);
+    display: flex; align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+  }
+
+  /* Logo SERIGRAPHIE MAT : peinture plate sur le metal, comme une
+     vraie pedale. Une ombre 1px sous les lettres (epaisseur d'encre),
+     PAS de glow — la lumiere ne bave pas sur une sérigraphie. */
+  .logo {
+    font-size: 24px; font-weight: 800; letter-spacing: 3px;
+    color: var(--accent);
+    text-shadow: 0 1px 1px rgba(0,0,0,.6);
+    user-select: none; white-space: nowrap;
+  }
+  .logo .dim { font-weight: 300; letter-spacing: 3px;
+               color: var(--accent); opacity: .72;
+               text-shadow: 0 1px 1px rgba(0,0,0,.6); }
+
+  .spacer { flex: 1; }
+
+  /* ============================================================
+     BOUTONS ANALOGIQUES (faux 3D)
+     Une capsule hardware : corps en demi-bombé (gradient vertical),
+     arête claire en haut (la lumiere), ombre portee en dessous (elle
+     SORTE de la plaque), et un inset au clic (elle S'ENFONCE).
+     ============================================================ */
+  .cap {
+    --cap-h: 34px;
+    position: relative;
+    height: var(--cap-h);
+    min-width: 34px;
+    padding: 0 12px;              /* le contenu respire dans le cap */
+    border-radius: 7px;
+    box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    font: 12px/1 "Segoe UI", system-ui, sans-serif;
+    font-weight: 700; letter-spacing: 1px;
+    color: #cfc9bf;
+    cursor: pointer; user-select: none;
+
+    /* Le corps : metal sombre bombe */
+    background: linear-gradient(to bottom,
+      #4a4742 0%, #35322e 45%, #26241f 55%, #1b1916 100%);
+    /* L'arete superieure attrape la lumiere ; les flancs s'assombrissent */
+    box-shadow:
+      inset 0  1px 0 rgba(255,255,255,.22),   /* lisiere claire haute   */
+      inset 0 -2px 3px rgba(0,0,0,.55),       /* ventre bas, ombre      */
+      inset 1px 0 0 rgba(255,255,255,.05),    /* flanc gauche           */
+      inset -1px 0 0 rgba(0,0,0,.35),         /* flanc droit            */
+      0 3px 4px rgba(0,0,0,.6);               /* OMBRE PORTEE : 3D      */
+    border: 1px solid #0d0c0a;
+    text-shadow: 0 -1px 0 rgba(0,0,0,.8);
+  }
+  .cap:hover { filter: brightness(1.12); }
+  .cap:active {
+    /* Enfoncee : le bombé s'inverse et l'ombre portee disparait */
+    background: linear-gradient(to bottom,
+      #1b1916 0%, #26241f 45%, #302d29 55%, #3a3733 100%);
+    box-shadow:
+      inset 0 2px 4px rgba(0,0,0,.7),
+      0 1px 1px rgba(0,0,0,.4);
+    transform: translateY(1px);
+  }
+
+  /* Variante metal clair (les ◀ ▶ du transport, comme des capots) */
+  .cap.silver {
+    color: #26231e;
+    background: linear-gradient(to bottom,
+      #b9b4ab 0%, #9a958c 45%, #827d74 55%, #6b675f 100%);
+    box-shadow:
+      inset 0  1px 0 rgba(255,255,255,.55),
+      inset 0 -2px 3px rgba(0,0,0,.35),
+      0 3px 4px rgba(0,0,0,.6);
+    border-color: #4c483f;
+    text-shadow: 0 1px 0 rgba(255,255,255,.3);
+  }
+
+  /* A / B : selecteurs ronds, le actif porte une couronne ambre */
+  .cap.round { border-radius: 50%; width: 36px; min-width: 36px; }
+  /* A actif : liseré peint violet + lettre claire. Un vrai bouton
+     illumine n'a pas de halo flou — l'anneau EST l'indication. */
+  .cap.round.active {
+    color: var(--accent-hi);
+    box-shadow:
+      inset 0  1px 0 rgba(255,255,255,.22),
+      inset 0 -2px 3px rgba(0,0,0,.55),
+      inset 0 0 0 1px rgba(var(--accent-glow), .35),
+      0 3px 4px rgba(0,0,0,.6);
+    border-color: var(--accent-deep);
+  }
+
+  /* Le preset : un ECRAN encastré (vitre sombre, valeur gravee) flanque
+     des caps de transport. L'inverse des boutons : il est DANS la plaque. */
+  .window {
+    height: 34px;
+    width: 240px;
+    border-radius: 6px;
+    box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    font: 13px/1 "Segoe UI", system-ui, sans-serif; font-weight: 600;
+    letter-spacing: .5px;
+    color: #d9d4c8;
+    background:
+      linear-gradient(to bottom, rgba(255,255,255,.05), rgba(0,0,0,.25)),
+      #12110f;
+    box-shadow:
+      inset 0 2px 5px rgba(0,0,0,.85),        /* la vitre est ENFONCEE  */
+      inset 0 -1px 0 rgba(255,255,255,.06),
+      0 1px 0 rgba(255,255,255,.07);          /* liseron bas (lumiere)  */
+    border: 1px solid #060505;
+  }
+  .window .arrow { color: #6d675e; font-size: 10px; margin-left: 8px; }
+
+  /* CAL : lampe temoin ENCASTREE dans une bague (le trou dans le cap),
+     glow contenu DANS le cap — la lumiere ne bave pas dehors. */
+  .cap .led {
+    width: 9px; height: 9px; border-radius: 5px; margin-right: 9px;
+    flex: none;
+    /* la veilleuse (etat off) : violet tres sombre */
+    background: radial-gradient(circle at 35% 30%, var(--accent-dark), #241540 70%);
+    /* la bague : alcove enfoncee autour de la lampe */
+    box-shadow:
+      0 0 0 3px #14120f,                       /* fond de l'alcove      */
+      0 0 0 4px rgba(255,255,255,.08),         /* liseron de la bague   */
+      inset 0 1px 1px rgba(0,0,0,.7);
+  }
+  .cap.cal.on .led {
+    /* LED reelle : vive et saturee, sans bloom. */
+    background: radial-gradient(circle at 35% 30%,
+                var(--accent-hi), var(--accent-mid) 55%, var(--accent-dark) 90%);
+    box-shadow:
+      0 0 0 3px #14120f,
+      0 0 0 4px rgba(255,255,255,.08),
+      inset 0 0 2px rgba(255,255,255,.65);
+  }
+
+  .status {
+    color: #a89f92; font-size: 11px; letter-spacing: .8px;
+    text-shadow: 0 1px 0 rgba(0,0,0,.8);
+    white-space: nowrap;
+    margin-left: 2px;
+  }
+  .status b { color: #d9d2c4; font-weight: 600; }
+
+  /* --- LCD : posé sous la barre, legerement reduit ------------------- */
+  .lcd {
+    position: absolute;
+    left: var(--lcd-x); top: var(--lcd-y);
+    width: 753px; height: 419px;
+    transform: scale(var(--lcd-scale));
+    transform-origin: top left;
+  }
+
+  .legend { margin-top: 14px; color: #8a8f96; font-size: 12px; white-space: pre-line; }
+</style>
+</head>
+<body>
+<h1>OD Vox — top bar V2 : sur la pédale, boutons analogiques</h1>
+<p class="hint">Barre raccourcie posée sur le corps de la pédale. Les caps
+sortent de la plaque (ombre portée) et s'enfoncent au clic — essaie.
+Variables CSS en tête de fichier.</p>
+
+<div class="stage">
+  <div class="bar">
+    <div class="logo">OD<span class="dim">VOX</span></div>
+    <div class="spacer"></div>
+
+    <div class="cap silver" title="précédent">&#9664;</div>
+    <div class="window">Init Voice<span class="arrow">&#9662;</span></div>
+    <div class="cap silver" title="suivant">&#9654;</div>
+
+    <div class="cap round active">A</div>
+    <div class="cap round">B</div>
+    <div class="cap" style="font-size:10px;">A&gt;B</div>
+
+    <div class="spacer"></div>
+
+    <div class="cap cal on"><span class="led"></span>CAL</div>
+    <div class="status"><b>0</b> smp</div>
+  </div>
+
+  <img class="lcd" src="../docs/assets/LCD_bezel.png" alt="">
+</div>
+
+<div class="legend" id="legend"></div>
+
+<script>
+"use strict";
+const cs = getComputedStyle(document.documentElement);
+document.getElementById("legend").textContent =
+`Bar : x=${cs.getPropertyValue('--bar-x')} y=${cs.getPropertyValue('--bar-y')} h=${cs.getPropertyValue('--bar-h')} (pedale x${cs.getPropertyValue('--pedal-x0')}..${cs.getPropertyValue('--pedal-x1')})
+LCD : scale ${cs.getPropertyValue('--lcd-scale')} -> ${(753*parseFloat(cs.getPropertyValue('--lcd-scale'))).toFixed(0)}x${(419*parseFloat(cs.getPropertyValue('--lcd-scale'))).toFixed(0)} a (${cs.getPropertyValue('--lcd-x')}, ${cs.getPropertyValue('--lcd-y')})
+Transposition C++ : caps peintes en code (meme logique que Metal.h : biseaux + ombre portee + inset au clic).`;
+</script>
+</body>
+</html>

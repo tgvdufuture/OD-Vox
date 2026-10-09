@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>OD Vox — mockup écran EQ (LCD)</title>
+<style>
+  /* ============================================================
+     Mockup pixel-perfect de l'écran EQ.
+     - Le CADRE (bezel, vis, vitre, cadre plot, labels) est l'image
+       nettoyée docs/assets/LCD_bezel.png.
+     - La partie DYNAMIQUE (courbe, handles, pointillés verticaux,
+       ligne 0 dB) est dessinée en code sur un canvas superposé.
+     - Toutes les constantes sont mesurées au pixel sur
+       docs/assets/LCD_fige.png (voir GEOMETRIE plus bas).
+     - Le mode DIFF superpose l'original à 50 % pour vérifier
+       l'alignement ; on itère là-dessus.
+
+     Unités : tout est exprimé en px de l'image 753x419. Le canvas
+     est affiché à l'échelle 1:1 et peut être zoomé (x2, x4).
+     ============================================================ */
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; padding: 24px; background: #17181a; color: #cfd2d6;
+    font: 13px/1.5 "Segoe UI", system-ui, sans-serif;
+  }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  .hint { color: #8a8f96; margin: 0 0 16px; }
+  .stage { position: relative; width: 753px; height: 419px;
+           outline: 1px solid #2c2e32; background: #000; }
+  .stage img, .stage canvas {
+    position: absolute; inset: 0; width: 753px; height: 419px;
+    image-rendering: pixelated;
+  }
+  #dyn { cursor: crosshair; }
+  .bar { display: flex; gap: 10px; align-items: center; margin: 12px 0 0; }
+  button, select {
+    background: #232529; color: #cfd2d6; border: 1px solid #3a3d42;
+    border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer;
+  }
+  button:hover { background: #2c2f34; }
+  .legend { margin-top: 10px; color: #8a8f96; font-size: 12px; white-space: pre-line; }
+  .zoomwrap { margin-top: 16px; display: none; }
+  .zoomwrap.on { display: block; }
+  .zoomstage { position: relative; width: 1506px; height: 838px; overflow: hidden;
+               outline: 1px solid #2c2e32; background: #000; }
+  .zoomstage img, .zoomstage canvas {
+    position: absolute; inset: 0; width: 1506px; height: 838px;
+    image-rendering: pixelated;
+  }
+</style>
+</head>
+<body>
+<h1>OD Vox — écran EQ (LCD pixel-perfect)</h1>
+<p class="hint">Le cadre est l'image nettoyée <code>docs/assets/LCD_bezel.png</code> ;
+courbe, handles et pointillés sont dessinés en code. Tire les handles.</p>
+
+<div class="stage" id="stage">
+  <img id="bezel" src="../docs/assets/LCD_bezel.png" alt="bezel">
+  <canvas id="dyn" width="753" height="419"></canvas>
+</div>
+
+<div class="bar">
+  <button id="btnDiff">Diff 50/50</button>
+  <button id="btnOriginal">Courbe originale</button>
+  <select id="zoom">
+    <option value="1">Zoom 1x</option>
+    <option value="2">Zoom 2x</option>
+    <option value="4">Zoom 4x</option>
+  </select>
+  <span id="status"></span>
+</div>
+
+<div class="zoomwrap" id="zoomwrap">
+  <div class="zoomstage" id="zoomstage">
+    <img src="../docs/assets/LCD_bezel.png" alt="">
+    <canvas id="dynzoom" width="753" height="419"></canvas>
+  </div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<script>
+"use strict";
+/* ================================================================
+   GEOMETRIE — mesurée au pixel sur docs/assets/LCD_fige.png (753x419)
+   L'unité LCD vaut 2 px réels (tous les traits de l'export font 2px).
+   ================================================================ */
+const G = {
+  plot:  { x0: 196, x1: 620, y0: 117, y1: 272 }, // cadre extérieur du plot
+  zero:  { y: 194, on: 3, gap: 2 },               // ligne 0 dB : 1 unité de haut, 3/2 en unités LCD
+  yDb:   { top: 126, bottom: 264 },               // centres labels +12 / -12
+  // Mapping décades mesuré sur les labels X : 100 @x244, 1k @x408, 10k @x574
+  fMin:  100, decPx: 165, xAt100: 244,
+  handle: 10,                                     // handle 10 unités LCD = 20 px
+  ink:    "#111417",                              // encre LCD (moyenne mesurée ~#0d0e0f)
+  vDash:  { unit: 2, on: 4, gap: 4 },             // pointillé vertical
+};
+
+// Convertit une fréquence (Hz) en x pixels : log, 165 px par décade.
+const fToX = f => G.xAt100 + Math.log10(f / G.fMin) * G.decPx;
+const xToF = x => G.fMin * Math.pow(10, (x - G.xAt100) / G.decPx);
+// Grille LCD : 1 unité LCD = 2 px réels, tout élément dessiné s'aligne sur
+// une colonne/ligne PAIRE — sinon le canvas rend en sous-pixel (points
+// flous/plus fins, l'écart qu'on voyait sur la 1ère ligne verticale).
+const snap = v => Math.round(v / 2) * 2;
+// Convertit un gain (dB) en y pixels : +12 dB -> y126, 0 dB -> y195, -12 dB -> y264.
+function gainToY(db) {
+  const yTop = G.yDb.top, yBot = G.yDb.bottom; // centres des labels +12 / -12
+  return yTop + (12 - db) / 24 * (yBot - yTop);
+}
+// Et l'inverse pour le drag.
+function yToGain(y) {
+  const yTop = G.yDb.top, yBot = G.yDb.bottom;
+  return 12 - (y - yTop) / (yBot - yTop) * 24;
+}
+
+/* ---------------------------------------------------------------
+   ÉTAT — 4 bands, calés sur les positions de la photo pour le diff
+   (±5.1 dB mesurés sur les handles de LCD_fige.png)
+   --------------------------------------------------------------- */
+const bands = [
+  { f: 118,   gain: -5.1, q: 0.9 },
+  { f: 464,   gain: +5.1, q: 0.9 },
+  { f: 2480,  gain: -5.1, q: 0.9 },
+  { f: 11200, gain: +5.1, q: 0.9 },
+];
+
+/* ---------------------------------------------------------------
+   COURBE — somme de 4 biquads peaking (réponse en dB), tracée en
+   escalier (pas 2px) pour coller au rendu LCD.
+   --------------------------------------------------------------- */
+function peakResponseDb(f, fc, gainDb, q) {
+  // Approximation symétrique en log — suffisante pour le mockup.
+  const o = Math.log2(f / fc);            // octaves d'écart
+  const w = 1 / Math.max(q, 0.1);         // largeur (octaves ~ 1/Q)
+  return gainDb * Math.exp(-Math.pow(o / (w * 0.85), 2));
+}
+function curveGainDb(f) {
+  let g = 0;
+  for (const b of bands) g += peakResponseDb(f, b.f, b.gain, b.q);
+  return g;
+}
+
+/* ---------------------------------------------------------------
+   DESSIN — tout en unités LCD de 2px, comme l'original.
+   --------------------------------------------------------------- */
+const cv = document.getElementById("dyn");
+const ctx = cv.getContext("2d");
+const U = 2; // px réels par unité LCD
+
+function clearPlot() {
+  // On ne efface que l'intérieur du plot (le bezel est sous le canvas)
+  ctx.clearRect(0, 0, 753, 419);
+}
+
+function drawZeroLine(ctxRef) {
+  // Ligne 0 dB : pointillés UNIFORMES (la maquette avait un rythme dessiné
+  // à la main, irrégulier — ici 3 unités LCD allumées, 2 éteintes).
+  const { x0, x1 } = G.plot;
+  const on = G.zero.on * U, gap = G.zero.gap * U;
+  ctxRef.fillStyle = G.ink;
+  for (let x = x0 + 1; x < x1 - 1; x += on + gap) {
+    ctxRef.fillRect(x, G.zero.y, Math.min(on, x1 - 1 - x), U);
+  }
+}
+
+function drawVerticalDash(xPix, ctxRef) {
+  const { y0, y1 } = G.plot;
+  const x = snap(xPix);                     // colonne paire : pixels nets
+  const on = G.vDash.on * U, gap = G.vDash.gap * U;
+  for (let y = y0 + 2; y < y1 - 2; y += on + gap) {
+    ctxRef.fillRect(x, y, U, Math.min(on, y1 - 2 - y));
+  }
+}
+
+function drawStaircase(ctxRef) {
+  const { x0, x1 } = G.plot;
+  ctxRef.fillStyle = G.ink;
+  const step = U; // pas de 2px : escalier LCD, colonnes paires
+  let prevY = null;
+  for (let x = x0 + 2; x <= x1 - 2; x += step) {
+    const y = snap(gainToY(curveGainDb(xToF(x))));
+    if (prevY !== null) {
+      // ligne verticale puis horizontale (escalier net, comme le LCD)
+      const ya = Math.min(prevY, y), yb = Math.max(prevY, y);
+      ctxRef.fillRect(x - step, ya, U, Math.max(yb - ya, U));
+    }
+    prevY = y;
+  }
+}
+
+function drawHandle(ctxRef, x, y) {
+  const s = G.handle * U;               // 20 px
+  ctxRef.fillStyle = G.ink;
+  ctxRef.fillRect(snap(x) - s / 2, snap(y) - s / 2, s, s);
+}
+
+function render() {
+  clearPlot();
+
+  // Ligne 0 dB (sous le reste)
+  drawZeroLine(ctx);
+
+  // Pointillés verticaux sur chaque handle (à travers, comme l'original)
+  for (const b of bands) drawVerticalDash(fToX(b.f), ctx);
+
+  // Courbe en escalier
+  drawStaircase(ctx);
+
+  // Handles par-dessus
+  for (const b of bands) drawHandle(ctx, fToX(b.f), gainToY(b.gain));
+
+  // Zoom : recopie
+  const zc = document.getElementById("dynzoom");
+  if (zc) zc.getContext("2d").drawImage(cv, 0, 0);
+
+  document.getElementById("status").textContent =
+    bands.map(b => `${b.f < 1000 ? b.f + "Hz" : (b.f/1000) + "k"}: ${b.gain > 0 ? "+" : ""}${b.gain.toFixed(1)}dB`).join("   ");
+}
+
+/* ---------------------------------------------------------------
+   DIFF — superpose l'original à 50 % : tout écart d'alignement
+   apparaît en fantôme. Le canvas passe en dessous.
+   --------------------------------------------------------------- */
+let diffMode = false;
+document.getElementById("btnDiff").onclick = () => {
+  diffMode = !diffMode;
+  const img = document.getElementById("bezel");
+  img.src = diffMode ? "../docs/assets/LCD_fige.png" : "../docs/assets/LCD_bezel.png";
+  cv.style.opacity = diffMode ? "0.5" : "1";
+  document.getElementById("btnDiff").textContent = diffMode ? "Vue nette" : "Diff 50/50";
+};
+document.getElementById("btnOriginal").onclick = () => {
+  bands[0] = { f: 118,   gain: -5.1, q: 0.9 };
+  bands[1] = { f: 464,   gain: +5.1, q: 0.9 };
+  bands[2] = { f: 2480,  gain: -5.1, q: 0.9 };
+  bands[3] = { f: 11200, gain: +5.1, q: 0.9 };
+  render();
+};
+document.getElementById("zoom").onchange = e => {
+  const z = e.target.value;
+  document.getElementById("zoomwrap").classList.toggle("on", z !== "1");
+};
+
+/* ---------------------------------------------------------------
+   DRAG — tire un handle (fenêtre 14 px autour du centre)
+   --------------------------------------------------------------- */
+let drag = -1;
+cv.addEventListener("pointerdown", e => {
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (753 / r.width);
+  const y = (e.clientY - r.top) * (419 / r.height);
+  drag = bands.findIndex(b => Math.hypot(fToX(b.f) - x, gainToY(b.gain) - y) < 14);
+  if (drag >= 0) cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener("pointermove", e => {
+  if (drag < 0) return;
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (753 / r.width);
+  const y = (e.clientY - r.top) * (419 / r.height);
+  const b = bands[drag];
+  b.f = Math.min(20000, Math.max(20, xToF(x)));
+  b.gain = Math.min(12, Math.max(-12, yToGain(y)));
+  render();
+});
+cv.addEventListener("pointerup", () => drag = -1);
+
+render();
+
+// ?diff=1 : active la superposition 50/50 contre l'original (pour les
+// captures headless de verification d'alignement).
+if (new URLSearchParams(location.search).has("diff")) {
+  document.getElementById("btnDiff").click();
+}
+
+document.getElementById("legend").textContent =
+`Géométrie (mesurée sur LCD_fige.png 753x419) :
+  plot x ${G.plot.x0}–${G.plot.x1}, y ${G.plot.y0}–${G.plot.y1} · 0 dB y=${G.zero.y} (pointillés 3/2 uniformes) · +12 y=126 · −12 y=264
+  axe log : 100 Hz @x244, 165 px/décade · handle 10 unités LCD (20 px) · traits 2 px`;
+</script>
+</body>
+</html>

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>OD Vox — cartes V6 (héros à gauche, sections empilées à droite)</title>
+<style>
+  /* ============================================================
+     CARTES V6 — la structure retenue :
+       - COMP en pièce maîtresse à GAUCHE, centré verticalement
+         (grand knob héros, d=127), DC filter dessous ;
+       - à DROITE, trois bandes horizontales EMPILÉES :
+         TON (LCD + correcteurs + drive) / PROPRIETÉ / ESPACE ;
+       - niveaux : deux instruments indépendants aux coins du bas.
+     Vocabulaire top bar V2 : alcôves sombres, knobs métal clair,
+     sérigraphie violette. Tout se règle par variables CSS.
+     ============================================================ */
+  :root {
+    --ed-w: 980px;
+    --ed-h: 516px;
+
+    --pedal-x0: 75px;  --pedal-x1: 890px;
+    --pedal-y0: 30px;  --pedal-y1: 465px;
+
+    /* --- Top bar V2 (cotes de la maquette validée) --- */
+    --bar-x: 95px; --bar-y: 44px; --bar-h: 54px;
+
+    /* --- Les zones : héros à gauche, bandes empilées à droite --- */
+    --zones-x: 85px; --zones-y: 112px;
+    --zones-w: 805px; --zones-h: 344px;   /* bas a y456, 9px avant le bord de pédale */
+    --hero-w: 205px;
+    /* (largeur des bandes = max-content du contenu le plus long, pas un chiffre fixe) */
+    --band-gap: 8px;
+    --knob: 96px;                          /* le knob HEROS (comp) */
+
+    /* --- ACCENT top bar (Palette.h, inchangé) --- */
+    --accent:      #bd9bff;
+    --accent-hi:   #e8dcff;
+    --accent-mid:  #a86ef5;
+    --accent-dark: #6b3fc4;
+    --accent-glow: 150, 95, 255;
+    --accent-deep: #4d3385;
+
+    color-scheme: dark;
+  }
+  body { margin: 0; padding: 24px; background: #101012; color: #cfd2d6;
+         font: 13px/1.5 "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  .hint { color: #8a8f96; margin: 0 0 16px; }
+
+  .stage {
+    position: relative; width: var(--ed-w); height: var(--ed-h);
+    background: #000 url("../assets/background.png") center / cover no-repeat;
+    outline: 1px solid #2c2e32; overflow: hidden;
+  }
+
+  /* ================= TOP BAR V2 (redessinée pour l'ensemble) =========== */
+  .bar {
+    position: absolute; left: var(--bar-x); top: var(--bar-y);
+    width: calc(var(--pedal-x1) - var(--pedal-x0) - 2 * (var(--bar-x) - var(--pedal-x0)));
+    height: var(--bar-h);
+    display: flex; align-items: center; gap: 10px; box-sizing: border-box;
+  }
+  .logo { font-size: 24px; font-weight: 800; letter-spacing: 3px;
+          color: var(--accent); text-shadow: 0 1px 1px rgba(0,0,0,.6);
+          user-select: none; white-space: nowrap; }
+  .logo .dim { font-weight: 300; opacity: .72; }
+  .spacer { flex: 1; }
+  .cap {
+    --cap-h: 34px; position: relative; height: var(--cap-h); min-width: 34px;
+    padding: 0 12px; border-radius: 7px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    font: 12px/1 "Segoe UI", system-ui, sans-serif; font-weight: 700; letter-spacing: 1px;
+    color: #cfc9bf; cursor: pointer; user-select: none;
+    background: linear-gradient(to bottom, #4a4742 0%, #35322e 45%, #26241f 55%, #1b1916 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 3px rgba(0,0,0,.55),
+      inset 1px 0 0 rgba(255,255,255,.05), inset -1px 0 0 rgba(0,0,0,.35),
+      0 3px 4px rgba(0,0,0,.6);
+    border: 1px solid #0d0c0a; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
+  }
+  .cap.silver {
+    color: #26231e;
+    background: linear-gradient(to bottom, #b9b4ab 0%, #9a958c 45%, #827d74 55%, #6b675f 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -2px 3px rgba(0,0,0,.35),
+                0 3px 4px rgba(0,0,0,.6);
+    border-color: #4c483f; text-shadow: 0 1px 0 rgba(255,255,255,.3);
+  }
+  /* Caps de transport RONDES a chevron VIOLET (presets et division) :
+     le bouton reste silver (il sort de la plaque), la fleche est une piece
+     violette posee dessus. Le geste preset/division se reconnait d'un coup
+     d'oeil sur toute l'interface. */
+  .cap.arrow { border-radius: 50%; width: 34px; min-width: 34px; padding: 0;
+               display: inline-flex; align-items: center; justify-content: center; }
+  .cap.arrow svg, .mcap svg { display: block; }
+  .cap.round { border-radius: 50%; width: 36px; min-width: 36px; padding: 0; }
+  .cap.round.active {
+    color: var(--accent-hi);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 3px rgba(0,0,0,.55),
+                inset 0 0 0 1px rgba(var(--accent-glow), .35), 0 3px 4px rgba(0,0,0,.6);
+    border-color: var(--accent-deep);
+  }
+  .window {
+    height: 34px; width: 240px; border-radius: 6px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    font: 13px/1 "Segoe UI", system-ui, sans-serif; font-weight: 600; letter-spacing: .5px;
+    color: #d9d4c8;
+    background: linear-gradient(to bottom, rgba(255,255,255,.05), rgba(0,0,0,.25)), #12110f;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,.85), inset 0 -1px 0 rgba(255,255,255,.06),
+                0 1px 0 rgba(255,255,255,.07);
+    border: 1px solid #060505;
+  }
+  .window .arrow { color: #6d675e; font-size: 10px; margin-left: 8px; }
+  .status { color: #a89f92; font-size: 11px; letter-spacing: .8px;
+            text-shadow: 0 1px 0 rgba(0,0,0,.8); white-space: nowrap; }
+  .status b { color: #d9d2c4; font-weight: 600; }
+
+  /* ============================================================
+     LES ZONES : héros (gauche) + bandes empilées (droite)
+     ============================================================ */
+  /* --- L'ETAGE HAUT : LCD + COMP, plein largeur --- */
+  .zones {
+    position: absolute; left: var(--zones-x); top: var(--zones-y);
+    width: var(--zones-w); height: 196px;
+    display: flex; gap: 10px;
+    z-index: 3;
+  }
+  .hero { flex: 1 1 auto; }
+
+  /* --- L'ETAGE BAS : les 4 cartes en GRILLE 2x2 --- */
+  .bottom {
+    position: absolute; left: var(--zones-x); top: 316px;
+    width: var(--zones-w); height: 142px;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    z-index: 3;
+  }
+  .bottom .band { width: auto; height: auto; }
+
+  /* --- Alcôve sombre (fond commun héros et bandes) --- */
+  .hero, .band {
+    border-radius: 9px; box-sizing: border-box;
+    background: linear-gradient(to bottom, #0b0a09, #13110f 30%, #181512 100%);
+    box-shadow:
+      inset 0 3px 7px rgba(0,0,0,.85),
+      inset 0 -1px 0 rgba(255,255,255,.05),
+      0 1px 0 rgba(255,255,255,.07);
+    border: 1px solid #060505;
+  }
+
+  /* --- Le héros : COMP, centré verticalement, à gauche --- */
+  /* Le heros : COMP a gauche, LCD a droite — CENTRES dans l'alcoVe —
+     et une ligne de toggles en bas a droite (position absolute, elle ne
+     decale pas le contenu). */
+  .hero {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    padding: 5px;
+  }
+  .heromain { flex: 1 1 auto; display: flex; flex-direction: row; align-items: center;
+              justify-content: center; gap: 18px; min-height: 0; }
+  .heroside { flex: none; display: flex; flex-direction: column;
+              align-items: center; gap: 10px;
+              transform: translateY(8px); }   /* le disque COMP s'aligne sur le centre du LCD (valeur+nom pesent dessous) */
+  .herotogs { position: absolute; right: 12px; bottom: 6px;
+              display: flex; gap: 14px; }
+  .heromtr { display: flex; align-items: stretch; justify-content: center; gap: 10px; }
+  .m { width: 10px; border-radius: 3px; position: relative; overflow: hidden;
+       background: linear-gradient(to bottom, #0b0a09, #12100e);
+       box-shadow: inset 0 1px 3px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.06);
+       border: 1px solid #060505; }
+  .m i { position: absolute; bottom: 0; left: 0; width: 100%; height: 0%;
+         background: linear-gradient(to top, var(--accent-dark), var(--accent-mid));
+         transition: height .18s ease-out; }
+
+  /* --- Les bandes empilées : TON / PROPRIETÉ / ESPACE --- */
+  /* La largeur commune aux 4 bandes = le contenu le plus LONG (max-content) :
+     les bandes s'etirent toutes a cette largeur, SANS vide inutile — c'est la
+     rangee la plus garnie qui fixe la taille, les autres la remplissent. */
+  .bands { flex: none; width: max-content;
+           display: flex; flex-direction: column; gap: var(--band-gap); }
+  .band { flex: none; height: max-content; align-self: stretch; box-sizing: border-box;
+          display: flex; align-items: center; justify-content: flex-start;
+          gap: 16px; padding: 6px 14px 6px 12px; }
+  /* La colonne des bandes s'epanouit pour occuper TOUTE la hauteur dispo :
+     l'air restant se repartit ENTRE les bandes (elles gardent leur taille). */
+  .bands { justify-content: space-between; }
+
+  /* LED de bande, seule en bord — elle ouvre le pas : tous les elements
+     suivent a gauche, alignes. NOUVEAU COMPORTEMENT : la LED est L'INTERRUPTEUR
+     du groupe — clic = active/desactive les effets de la bande. Son etat OFF
+     est visible : veilleuse sombre + assombrissement du contenu. */
+  .bled { flex: none; width: 8px; height: 8px; border-radius: 4px; margin-right: 6px;
+          cursor: pointer;
+          background: radial-gradient(circle at 35% 30%, var(--accent-dark), #241540 70%);
+          box-shadow: 0 0 0 2px #14120f, 0 0 0 3px rgba(255,255,255,.08),
+                      inset 0 1px 1px rgba(0,0,0,.7); }
+  .band.on .bled {
+          background: radial-gradient(circle at 35% 30%,
+                      var(--accent-hi), var(--accent-mid) 55%, var(--accent-dark) 90%);
+          box-shadow: 0 0 0 2px #14120f, 0 0 0 3px rgba(255,255,255,.08),
+                      inset 0 0 2px rgba(255,255,255,.65); }
+  .band.off .bandbody { opacity: .38; filter: saturate(.4); }
+  .band.off .bled { cursor: pointer; }
+
+  /* Le corps de bande : tout ce qui peut s'assombrir quand le groupe est OFF */
+  .bandbody { display: flex; align-items: center; justify-content: flex-start;
+              gap: 16px; flex: 1 1 auto; min-width: 0; }
+
+  /* --- Knobs --- */
+  .slot { display: flex; flex-direction: column; align-items: center; flex: none; }
+  .slot .nm { font: 600 9px/1 "Segoe UI", sans-serif; letter-spacing: .6px;
+              color: #c9c3b8; text-shadow: 0 -1px 0 rgba(0,0,0,.8);
+              margin-top: 2px; white-space: nowrap; }
+  .grp { display: flex; flex-direction: column; align-items: center; flex: none; gap: 3px; }
+  .krow { display: flex; justify-content: flex-start; gap: 16px; align-items: flex-start; }
+
+  .k {
+    position: relative; border-radius: 50%; flex: none;
+    background: radial-gradient(circle at 33% 26%, #d9d5cd 0%, #b5b1a9 40%, #8b8781 70%, #56534e 100%);
+    box-shadow:
+      inset 0 2px 2px rgba(255,255,255,.6),
+      inset 0 -3px 5px rgba(0,0,0,.45),
+      0 4px 6px rgba(0,0,0,.75),
+      0 0 0 1px #0d0c0a;
+    cursor: ns-resize;
+  }
+  .k::before {
+    content: ""; position: absolute; inset: 14%; border-radius: 50%;
+    background: radial-gradient(circle at 35% 28%, #c4c0b8, #a29e96 75%);
+    box-shadow: inset 0 1px 2px rgba(255,255,255,.4), inset 0 -2px 3px rgba(0,0,0,.3),
+                0 0 0 1px rgba(0,0,0,.25);
+  }
+  .k::after {
+    content: ""; position: absolute;
+    border-radius: 2px; background: #26231e;
+    box-shadow: 0 1px 0 rgba(255,255,255,.35);
+    transform: rotate(var(--a, 0deg));
+  }
+  .k.hk { width: var(--knob); height: var(--knob); }
+  .k.hk::before { inset: 13%; }
+  .k.hk::after { left: calc(50% - 1.75px); top: 7px; width: 3.5px; height: 26px;
+                 transform-origin: 1.75px 41px; }
+  /* Un knob par taille : 44 px dans les cartes de la grille (les rangees
+     font 67 px de haut). Les ids de bande portent la taille. */
+  #b-ton .k, #b-pro .k, #b-delay .k, #b-reverb .k { width: 44px; height: 44px; }
+  #b-ton .k::after, #b-pro .k::after, #b-delay .k::after, #b-reverb .k::after {
+    left: calc(50% - 1.25px); top: 3.5px; width: 2.5px; height: 13px;
+    transform-origin: 1.25px 18.5px; }
+  .k.band { width: 24px; height: 24px; }
+  .k.band::before { inset: 15%; }
+  .k.band::after { top: 2.5px; width: 2.5px; height: 8px;
+                   transform-origin: 1.25px 9.75px; }
+
+  /* --- Écran de valeur --- */
+  .v {
+    min-width: 52px; height: 14px; padding: 0 6px; margin-top: 4px;
+    border-radius: 3px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    font: 600 9px/1 Consolas, monospace; letter-spacing: .4px;
+    color: var(--accent-hi);
+    background: linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,.15)), #0b0a09;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.06);
+    border: 1px solid #060505; white-space: nowrap;
+  }
+
+  /* --- Interrupteurs --- */
+  .sw { width: 24px; height: 13px; border-radius: 7px; position: relative; flex: none;
+        background: linear-gradient(to bottom, #0d0c0b, #191714);
+        box-shadow: inset 0 2px 3px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.07);
+        border: 1px solid #060505; cursor: pointer; }
+  .sw i { position: absolute; top: 1px; left: 1.5px; width: 10px; height: 10px;
+          border-radius: 50%;
+          background: radial-gradient(circle at 35% 30%, #9b978f, #55524c);
+          box-shadow: 0 1px 2px rgba(0,0,0,.6); transition: left .12s ease; }
+  .sw.on i { left: calc(100% - 11.5px);
+             background: radial-gradient(circle at 35% 30%,
+                         var(--accent-hi), var(--accent-mid) 55%, var(--accent-dark) 90%);
+             box-shadow: 0 1px 2px rgba(0,0,0,.6), 0 0 4px rgba(var(--accent-glow), .45); }
+  .swlbl { display: inline-flex; align-items: center; gap: 4px;
+           font: 600 8.5px/1 "Segoe UI", sans-serif; letter-spacing: .6px; color: #a39d92;
+           text-shadow: 0 -1px 0 rgba(0,0,0,.8); cursor: pointer; }
+
+  /* --- Le selecteur de division (delay_time : choice a 21 valeurs),
+         habille comme le menu preset de la top bar : vitre + fleches --- */
+  .divwrap { display: inline-flex; align-items: center; }
+  /* Le trio colle : les coins exterieurs seuls restent arrondis,
+     la vitre et les caps se touchent (bordure violette continue). */
+  .divwrap .mcap:first-child { border-radius: 4px 0 0 4px; }
+  .divwrap .mcap:last-child  { border-radius: 0 4px 4px 0; }
+  .divwrap .divbox { border-radius: 0; }
+  .divbox { height: 16px; padding: 0 7px; border-radius: 3px; box-sizing: border-box;
+            display: inline-flex; align-items: center; gap: 4px;
+            font: 700 9px/1 Consolas, monospace; letter-spacing: .5px;
+            color: var(--accent-hi); cursor: pointer;
+            background: linear-gradient(to bottom, rgba(0,0,0,.45), rgba(0,0,0,.15)), #0b0a09;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.06);
+            border: 1px solid rgba(168, 110, 245, .65); }   /* bordure violette */
+  .divbox span { color: #6d675e; font-size: 7px; }
+  /* Les mini-caps de la DIVISION : RECTANGULAIRES, a la hauteur de la
+     vitre 1/4, metal sombre, chevron violet. (Les rondes restent la
+     signature du transport PRESET en top bar.) */
+  .mcap { flex: none; width: 18px; height: 16px; border-radius: 4px; box-sizing: border-box;
+          display: inline-flex; align-items: center; justify-content: center;
+          font: 700 8px/1 "Segoe UI", sans-serif; color: var(--accent); cursor: pointer;
+          background: linear-gradient(to bottom, #4a4742 0%, #35322e 45%, #26241f 55%, #1b1916 100%);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 -2px 3px rgba(0,0,0,.55),
+                      0 2px 3px rgba(0,0,0,.6);
+          border: 1px solid #0d0c0a;
+          user-select: none; }
+  .mcap:active { box-shadow: inset 0 2px 3px rgba(0,0,0,.55); }
+  .mcap:active::first-letter { transform: translateY(0.5px); }
+
+  /* --- Le VRAI LCD : il vit dans l'alcôve du HEROS, au-dessus de COMP.
+         LE PLUS GROS POSSIBLE : la largeur est bornee par la hauteur
+         restante de la colonne (LOW CUT + COMP 96 + DC), au ratio 753/419
+         de l'asset. 258 px = le maximum sans debordement. --- */
+  .lcd {
+    display: block; flex: none;
+    width: 330px; height: auto;   /* borne : heromain ~184 (etage 196 - padding 12) */
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.6));
+  }
+
+  /* ============================================================
+     LES NIVEAUX — deux instruments indépendants aux coins du bas
+     ============================================================ */
+  .hmeter { position: absolute; bottom: 3px;
+            display: flex; align-items: center; gap: 8px; z-index: 3; }
+  .hmeter.left  { left: 6px; }
+  .hmeter.right { right: 6px; }
+  .hlabel { flex: none; width: 34px; text-align: center;
+            font: 800 10px/1 "Segoe UI", sans-serif; letter-spacing: 2px;
+            color: var(--accent); text-shadow: 0 1px 1px rgba(0,0,0,.7); }
+  .hwin { width: 370px; height: 9px; border-radius: 3px; position: relative;
+          overflow: hidden;
+          background: linear-gradient(to bottom, #0b0a09, #12100e);
+          box-shadow: inset 0 2px 4px rgba(0,0,0,.9), inset 0 -1px 0 rgba(255,255,255,.06),
+                      0 1px 0 rgba(255,255,255,.05);
+          border: 1px solid #060505; }
+  .hwin i { position: absolute; top: 0; bottom: 0; left: 0; width: 0%;
+            background: linear-gradient(to right, var(--accent-dark), var(--accent-mid) 75%, var(--accent-mid));
+            transition: width .16s ease-out; }
+  .hmeter.right .hwin i { left: auto; right: 0;
+            background: linear-gradient(to left, var(--accent-dark), var(--accent-mid) 75%, var(--accent-mid)); }
+  .hwin::after {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(90deg,
+      transparent 0 calc(25% - 1px), rgba(255,255,255,.13) calc(25% - 1px) 25%);
+  }
+
+  .legend { margin-top: 14px; color: #8a8f96; font-size: 12px; white-space: pre-line; }
+</style>
+</head>
+<body>
+<h1>OD Vox — cartes V6 : héros à gauche, sections empilées à droite</h1>
+<p class="hint">COMP en pièce maîtresse, centré verticalement à gauche. À droite, trois bandes
+empilées : TON (LCD + correcteurs + drive), PROPRIETÉ, ESPACE. Niveaux IN/OUT aux coins du bas.
+Knobs : drag vertical. Interrupteurs : clic.</p>
+
+<div class="stage">
+
+  <div class="zones">
+
+    <!-- ============ HEROS : COMP, centré verticalement ============= -->
+    <div class="hero on" id="hero">
+      <div class="heromain">
+        <div class="heroside">
+          <div class="heromtr">
+            <div class="slot">
+              <div class="k hk" style="--a:0deg" data-a="0"></div>
+              <div class="v">0 %</div><div class="nm">COMP</div>
+            </div>
+          </div>
+        </div>
+        <img class="lcd" src="../assets/lcd_bezel.png" alt="EQ">
+      </div>
+      <div class="herotogs">
+        <span class="swlbl"><span class="sw on"><i></i></span>LOW CUT</span>
+        <span class="swlbl"><span class="sw on"><i></i></span>DC FILTER</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ GRILLE 2x2 : les 4 cartes ========================= -->
+  <div class="bottom">
+    <div class="band on" id="b-ton">
+      <span class="bled" title="EQ on/off"></span>
+      <div class="bandbody">
+        <div class="krow">
+          <div class="slot"><div class="k sm" style="--a:45deg" data-a="45"></div><div class="nm">LOW</div></div>
+          <div class="slot"><div class="k sm" style="--a:45deg" data-a="45"></div><div class="nm">MID</div></div>
+          <div class="slot"><div class="k sm" style="--a:45deg" data-a="45"></div><div class="nm">HIGH</div></div>
+          <div class="slot"><div class="k sm" style="--a:45deg" data-a="45"></div><div class="nm">AIR</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="band on" id="b-pro">
+      <span class="bled" title="Effets de propreté on/off"></span>
+      <div class="bandbody">
+        <div class="heromtr">
+          <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div>
+            <div class="nm">GATE</div></div>
+        </div>
+        <div class="heromtr">
+          <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div>
+            <div class="nm">DE-ESS</div></div>
+        </div>
+        <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div>
+          <div class="nm">DRIVE</div></div>
+        <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">DOUBLER</div></div>
+        <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">WIDTH</div></div>
+      </div>
+    </div>
+
+    <div class="band on" id="b-reverb">
+      <span class="bled" title="Reverb on/off"></span>
+      <div class="bandbody">
+        <div class="krow">
+          <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">SHORT</div></div>
+          <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">SMALL</div></div>
+          <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">BIG</div></div>
+          <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">LUSH</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="band on" id="b-delay">
+      <span class="bled" title="Delay on/off"></span>
+      <div class="bandbody">
+        <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div>
+          <div class="nm">DELAY</div></div>
+        <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">FREE</div></div>
+        <div class="slot"><div class="k sm" style="--a:0deg" data-a="0"></div><div class="nm">DUCK</div></div>
+        <div class="grp">
+          <div class="divwrap">
+            <span class="mcap" id="div-prev" title="division precedente"><svg viewBox="0 0 10 10" width="8" height="8"><path d="M7 1.5 L3.5 5 L7 8.5" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <div class="divbox" id="div-val" title="delay_time : 21 divisions">1/4<span>&#9662;</span></div>
+            <span class="mcap" id="div-next" title="division suivante"><svg viewBox="0 0 10 10" width="8" height="8"><path d="M3 1.5 L6.5 5 L3 8.5" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </div>
+          <div class="swlbl" style="align-self:center"><span class="sw on"><i></i></span>SYNC</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ NIVEAUX : deux instruments indépendants =========== -->
+  <div class="hmeter left">
+    <span class="hlabel">IN</span>
+    <div class="k band" style="--a:0deg" data-a="0" title="Input Gain"></div>
+    <div class="hwin"><i id="hin"></i></div>
+  </div>
+  <div class="hmeter right">
+    <div class="hwin"><i id="hout"></i></div>
+    <div class="k band" style="--a:0deg" data-a="0" title="Output Gain"></div>
+    <span class="hlabel">OUT</span>
+  </div>
+
+  <!-- ============ TOP BAR V2, pour juger l'ensemble ================== -->
+  <div class="bar">
+    <div class="logo">OD<span class="dim">VOX</span></div>
+    <div class="spacer"></div>
+    <div class="cap arrow" title="précédent"><svg viewBox="0 0 10 10" width="11" height="11"><path d="M7 1.5 L3.5 5 L7 8.5" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="window">Init Voice<span class="arrow">&#9662;</span></div>
+    <div class="cap arrow" title="suivant"><svg viewBox="0 0 10 10" width="11" height="11"><path d="M3 1.5 L6.5 5 L3 8.5" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="cap round active">A</div>
+    <div class="cap round">B</div>
+    <div class="cap" style="font-size:10px;">A&gt;B</div>
+    <div class="spacer"></div>
+    <div class="cap">CAL</div>
+    <div class="status"><b>0</b> smp</div>
+  </div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<script>
+"use strict";
+/* Les knobs tournent, la valeur suit */
+document.querySelectorAll(".k").forEach(k => {
+  let a = parseFloat(k.dataset.a), y0 = null;
+  k.addEventListener("mousedown", e => { y0 = e.clientY; e.preventDefault(); });
+  window.addEventListener("mousemove", e => {
+    if (y0 === null) return;
+    a = Math.max(-135, Math.min(135, a + (y0 - e.clientY)));
+    y0 = e.clientY;
+    k.style.setProperty("--a", a + "deg");
+    k.dataset.a = a;
+    const norm = (a + 135) / 270, v = k.parentElement.querySelector(".v");
+    if (v) {
+      const old = v.textContent, n = Math.round(norm * 100);
+      v.textContent = old.includes("dB") ? (norm * 12 - 6).toFixed(1) + " dB"
+                    : old.includes("ms") ? n + " % · " + Math.round(20 + norm * 980) + " ms"
+                    : n + " %";
+    }
+  });
+  window.addEventListener("mouseup", () => { y0 = null; });
+});
+document.querySelectorAll(".sw").forEach(s =>
+  s.addEventListener("mousedown", e => { e.stopPropagation(); s.classList.toggle("on"); }));
+/* LA LED = l'interrupteur du groupe : clic -> on/off de la bande.
+   En C++ : la LED pilotera le (ou les) parametre(s) on/off du module.
+   Pour DELAY et REVERB il faudra un parametre enable (amendement). */
+document.querySelectorAll(".bled").forEach(led =>
+  led.addEventListener("click", () => {
+    const band = led.closest(".band");
+    band.classList.toggle("on");
+    band.classList.toggle("off");
+  }));
+/* Les fleches de la division : parcours des 21 valeurs, comme ◀ ▶ du preset */
+{
+  const divs = ("1/32T|1/32|1/32D|1/16T|1/16|1/16D|1/8T|1/8|1/8D|1/4T|1/4|1/4D"
+             + "|1/2T|1/2|1/2D|1/1T|1/1|1/1D|2/1T|2/1|2/1D").split("|");
+  let idx = 10;   /* 1/4, le defaut retenu */
+  const val = document.getElementById("div-val");
+  const show = () => { val.innerHTML = divs[idx] + "<span>\u25BE</span>"; };
+  document.getElementById("div-prev").addEventListener("click", () => { idx = (idx + divs.length - 1) % divs.length; show(); });
+  document.getElementById("div-next").addEventListener("click", () => { idx = (idx + 1) % divs.length; show(); });
+}
+/* Vumetres : niveaux en continu, reductions par a-coups */
+setInterval(() => {
+  const drive = (el, lo, hi) => {
+    const cur = parseFloat(el.style.width) || 0;
+    const target = lo + Math.random() * (hi - lo);
+    el.style.width = Math.max(target, cur - 11) + "%";
+  };
+  drive(document.getElementById("hin"), 25, 80);
+  drive(document.getElementById("hout"), 25, 80);
+  document.querySelectorAll(".m i").forEach(m => {
+    const cur = parseFloat(m.style.height) || 0;
+    const target = Math.random() < 0.35 ? 20 + Math.random() * 70 : 0;
+    m.style.height = Math.max(target, cur - 14) + "%";
+  });
+}, 220);
+document.getElementById("legend").textContent =
+`4 BANDES a taille CONTENU (hauteur minimale), largeur fixe commune ; l'air restant se repartit ENTRE elles ; la cellule de gauche (heros) prend toute la place en largeur. Niveaux IN/OUT aux coins, LED-interrupteur par bande.
+Transposition C++ : alcoves a hauteur contenu + hero flex-grow ; LED = toggle du groupe ; hq_mode retire, lowcut On par defaut (amendements PRD).`;
+</script>
+</body>
+</html>
