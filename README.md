@@ -1,42 +1,42 @@
 # OD Vox
 
-Chaîne vocale tout-en-un — plugin **VST3** (Windows), **C++20 / JUCE 8**.
+All-in-one vocal chain — **VST3** plugin (Windows), **C++20 / JUCE 8**.
 
-On charge un preset d'usine, on dose un curseur par module, on écoute. Le produit
-expose **29 paramètres, tous visibles** : pas de réglage caché, pas de mode avancé,
-un knob par idée.
+Load a factory preset, dial one knob per module, listen. The product exposes
+**29 parameters, all visible**: no hidden setting, no advanced mode, one knob per
+idea.
 
-## La chaîne
+## The chain
 
-Dans l'ordre du traitement :
+In processing order:
 
-| Étage | Réglage | Plage |
+| Stage | Parameter | Range |
 |---|---|---|
 | Input Gain | `input_gain_db` | −24 → +24 dB |
-| Calibration d'entrée | `input_calibrate` | action (écoute ~5 s) |
+| Input calibration | `input_calibrate` | action (~5 s of listening) |
 | Gate | `gate_amount` | 0 → 100 % |
-| Low Cut | `lowcut_amount` | On / Off — 120 Hz, 24 dB/oct fixes |
-| EQ 4 bandes | `eq_low_db`, `eq_mid_db`, `eq_hi_db`, `eq_air_db`, `eq_on` | ±15 dB |
+| Low Cut | `lowcut_amount` | On / Off — 120 Hz, 24 dB/oct fixed |
+| 4-band EQ | `eq_low_db`, `eq_mid_db`, `eq_hi_db`, `eq_air_db`, `eq_on` | ±15 dB |
 | Comp | `comp_amount` | 0 → 100 % |
 | De-ess | `deess_amount` | 0 → 100 % |
-| Drive | `drive_amount`, `hq_mode` | 0 → 100 % — HQ 4× toujours actif |
+| Drive | `drive_amount`, `hq_mode` | 0 → 100 % — HQ 4× always active |
 | Doubler / Width | `doubler_amount`, `width_amount` | 0 → 100 % / 0 → 200 % |
-| Delay | `delay_amount`, `delay_time`, `delay_sync`, `delay_time_ms`, `delay_ducking` | 21 divisions rythmiques ou 1–2000 ms |
+| Delay | `delay_amount`, `delay_time`, `delay_sync`, `delay_time_ms`, `delay_ducking` | 21 rhythmic divisions or 1–2000 ms |
 | Reverb | `reverb_short_pct`, `reverb_small_pct`, `reverb_big_pct`, `reverb_lush_pct` | 0 → 100 % |
-| Bypass de groupe | `fx_on`, `delay_on`, `reverb_on` | LED de bande |
-| Sortie | `output_gain_db`, `output_dc_filter` | ±24 dB — filtre DC à 10 Hz |
+| Group bypass | `fx_on`, `delay_on`, `reverb_on` | band LED |
+| Output | `output_gain_db`, `output_dc_filter` | ±24 dB — 10 Hz DC filter |
 
-**20 presets d'usine** sont livrés, dont 6 indexés par type de micro (SM7b, SM58,
-condensateur, NT1).
+**20 factory presets** ship with the plugin, including 6 indexed by microphone
+type (SM7b, SM58, condenser, NT1).
 
-## Construire
+## Building
 
-Prérequis :
+Requirements:
 
-- **CMake ≥ 3.22** ;
-- **Visual Studio (MSVC)** — construit ici avec le toolset 14.29 (VS 2019 16.11) ;
-- **JUCE 8** dans `external/JUCE`. Le dossier est ignoré par git : JUCE n'est pas
-  vendu dans ce dépôt.
+- **CMake ≥ 3.22**;
+- **Visual Studio (MSVC)** — built here with toolset 14.29 (VS 2019 16.11);
+- **JUCE 8** in `external/JUCE`. The folder is ignored by git: JUCE is not
+  bundled with this repository.
 
 ```bash
 git clone --branch 8.0.15 --depth 1 https://github.com/juce-framework/JUCE external/JUCE
@@ -44,60 +44,61 @@ cmake -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 ```
 
-Le bundle est produit dans `build/ODVox_artefacts/Release/VST3/OD Vox.vst3`. Le build
-active `COPY_PLUGIN_AFTER_BUILD` : il est aussi recopié dans le dossier VST3 du
-système (`C:\Program Files\Common Files\VST3\`).
+The bundle is produced at `build/ODVox_artefacts/Release/VST3/OD Vox.vst3`. The
+build enables `COPY_PLUGIN_AFTER_BUILD`: it is also copied to the system VST3
+folder (`C:\Program Files\Common Files\VST3\`).
 
-## Vérifier
+## Verifying
 
 ```bash
-cmake -B build -DODVOX_BUILD_TESTS=ON      # cibles de test : OFF par défaut
+cmake -B build -DODVOX_BUILD_TESTS=ON      # test targets: OFF by default
 cmake --build build --config Release
 ctest --test-dir build -C Release          # ODVoxTests + ODVoxEditorTests
 ```
 
-Les lots couvrent la logique (catalogue, presets, DSP, contrat de bus) et
-l'interface (dessin et gestes de la courbe d'EQ, hors écran, sans fenêtre).
+The suites cover the logic (catalog, presets, DSP, bus contract) and the
+interface (EQ curve drawing and gestures, offscreen, without a window).
 
-Le harnais de vérification hors ligne s'exécute sur le **VST3 installé** et couvre
-59 contrôles — transparence aux défauts, latence reportée, courbes, seuils :
+The offline verification harness runs against the **installed** VST3 and covers
+59 checks — transparency at default settings, reported latency, curves,
+thresholds:
 
 ```bash
-python tools/verify_plugin.py     # nécessite .venv : pedalboard, numpy, scipy
+python tools/verify_plugin.py     # requires .venv: pedalboard, numpy, scipy
 ```
 
-Il écrit `verification_report.md`.
+It writes `verification_report.md`.
 
-Captures et stress de l'éditeur (cibles manuelles) :
+Editor snapshots and stress (manual targets):
 
 ```bash
-cmake --build build --config Release --target ODVoxSnapshot   # capture PNG
-cmake --build build --config Release --target ODVoxStress     # création/destruction de l'éditeur
+cmake --build build --config Release --target ODVoxSnapshot   # PNG capture
+cmake --build build --config Release --target ODVoxStress     # editor create/destroy
 ```
 
 ## Documentation
 
-- `PRD.md` — spécification produit : catalogue de paramètres, contrats d'interface,
-  critères d'acceptation et les mesures qui les établissent.
-- `docs/FIGMA_KIT.md` — redessiner les assets d'interface dans Figma.
-- `tools/` — harnais de vérification et générateurs d'assets.
+- `PRD.md` — product specification: parameter catalog, interface contracts,
+  acceptance criteria and the measurements that establish them.
+- `docs/FIGMA_KIT.md` — redraw the interface assets in Figma.
+- `tools/` — verification harness and asset generators.
 
-## Licence
+## License
 
-**AGPL-3.0** — voir `LICENSE`.
+**AGPL-3.0** — see `LICENSE`.
 
-Le plugin embarque JUCE 8 et le SDK VST3 de Steinberg, dont les licences sont
-détaillées dans `THIRD_PARTY.md`. En résumé : publier OD Vox sous AGPLv3 est
-possible ; distribuer une version **à code fermé** ne l'est pas sans licence
-commerciale JUCE.
+The plugin embeds JUCE 8 and Steinberg's VST3 SDK, whose licenses are detailed in
+`THIRD_PARTY.md`. In short: publishing OD Vox under AGPLv3 is possible;
+distributing a **closed-source** version is not, without a commercial JUCE
+license.
 
-Les binaires publiés (GitHub Releases) sont accompagnés de leur code source
-correspondant, qui est ce dépôt — c'est ce qu'exige la licence.
+Released binaries (GitHub Releases) come with their corresponding source code,
+which is this repository — that is what the license requires.
 
 ## Provenance
 
-Aucune ligne de code, aucun asset graphique, aucun preset et aucune réponse
-impulsionnelle de ce dépôt ne provient d'un autre produit. Les repères de
-conception — ancres d'EQ à 120/700/1 750/10 000 Hz, courbe du compresseur,
-21 divisions rythmiques du delay, RT60 des quatre moteurs de reverb — sont des
-**valeurs retenues pour ce produit**, documentées comme telles dans `PRD.md`.
+No line of code, no graphical asset, no preset and no impulse response in this
+repository comes from another product. The design landmarks — EQ anchors at
+120/700/1,750/10,000 Hz, the compressor curve, the delay's 21 rhythmic
+divisions, the RT60 of the four reverb engines — are **values chosen for this
+product**, documented as such in `PRD.md`.
